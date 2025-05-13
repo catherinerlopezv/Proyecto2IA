@@ -1,1 +1,1 @@
-Proyecto de IA
+Proyecto de IA Reconocimiento
