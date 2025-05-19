@@ -16,13 +16,13 @@
       align-items: center;
       padding: 30px;
     }
-
+    
     h1 {
       color: #6366f1;
       font-size: 2.5em;
       margin-bottom: 30px;
     }
-
+    
     .container {
       display: flex;
       flex-direction: row;
@@ -30,57 +30,136 @@
       flex-wrap: wrap;
       justify-content: center;
     }
-
+    
     .video-container {
       border-radius: 15px;
       overflow: hidden;
       box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
       border: 2px solid #6366f1;
+      position: relative;
     }
-
+    
     .video-container img {
       width: 640px;
       height: auto;
       display: block;
     }
-
+    
     .dashboard {
       display: flex;
       flex-direction: column;
       gap: 15px;
       max-width: 300px;
     }
-
+    
     .card {
       background-color: #2d2d44;
       border-radius: 10px;
       padding: 20px;
       box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
     }
-
+    
     .card h2 {
       margin: 0 0 10px;
       font-size: 1.2em;
       color: #c7d2fe;
     }
-
+    
     .card p {
       margin: 0;
       font-size: 1.5em;
       font-weight: bold;
       color: #ffffff;
     }
+    
+    .card-emotions {
+      background-color: #2d2d44;
+      border-radius: 10px;
+      padding: 15px;
+      box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+    }
+    
+    .emotions-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    
+    .emotion-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #3d3d5c;
+      padding: 8px 12px;
+      border-radius: 6px;
+    }
+    
+    .emotion-icon {
+      font-size: 1.2em;
+      margin-right: 5px;
+    }
+    
+    .emotion-count {
+      font-weight: bold;
+      color: #a5b4fc;
+    }
+    
+    .status-indicator {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      display: flex;
+      align-items: center;
+      background-color: rgba(0, 0, 0, 0.6);
+      padding: 5px 10px;
+      border-radius: 15px;
+    }
+    
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #ccc;
+      margin-right: 8px;
+    }
+    
+    .status-dot.active {
+      background-color: #10b981;
+    }
+    
+    .status-text {
+      font-size: 12px;
+      color: #d4d4d8;
+    }
+    
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+      
+      .video-container img {
+        width: 100%;
+      }
+      
+      .dashboard {
+        max-width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
-
   <h1>Reconocimiento de Emociones</h1>
-
+  
   <div class="container">
     <div class="video-container">
-      <img src="{{ url_for('video_feed') }}" alt="Video Stream" />
+      <img src="{{ url_for('video_feed') }}" alt="Video Stream" id="videoFeed" />
+      <div class="status-indicator">
+        <div class="status-dot" id="statusDot"></div>
+        <div class="status-text" id="statusText">Conectando...</div>
+      </div>
     </div>
-
+    
     <div class="dashboard">
       <div class="card">
         <h2>Total de Personas Detectadas</h2>
@@ -90,29 +169,105 @@
         <h2>Emoción Predominante</h2>
         <p id="emocion">---</p>
       </div>
-      <div class="card">
+      <div class="card-emotions">
         <h2>Conteo por Emoción</h2>
-        <p id="conteo">😊 0 | 😐 0 | 😢 0</p>
+        <div class="emotions-grid">
+          <div class="emotion-item">
+            <span>😊 Feliz</span>
+            <span class="emotion-count" id="count-happy">0</span>
+          </div>
+          <div class="emotion-item">
+            <span>😐 Neutra</span>
+            <span class="emotion-count" id="count-neutral">0</span>
+          </div>
+          <div class="emotion-item">
+            <span>😢 Triste</span>
+            <span class="emotion-count" id="count-sad">0</span>
+          </div>
+          <div class="emotion-item">
+            <span>😠 Enojado</span>
+            <span class="emotion-count" id="count-angry">0</span>
+          </div>
+          <div class="emotion-item">
+            <span>🤢 Disgusto</span>
+            <span class="emotion-count" id="count-disgust">0</span>
+          </div>
+          <div class="emotion-item">
+            <span>😨 Miedo</span>
+            <span class="emotion-count" id="count-fear">0</span>
+          </div>
+          <div class="emotion-item">
+            <span>😲 Sorpresa</span>
+            <span class="emotion-count" id="count-surprise">0</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
-
+  
   <script>
+    // Variables para monitoreo de conexión
+    let lastUpdateTime = Date.now();
+    let connectionActive = false;
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const videoFeed = document.getElementById('videoFeed');
+    
+    // Comprobar estado de la conexión de video
+    function checkVideoConnection() {
+      const timeSinceLastUpdate = Date.now() - lastUpdateTime;
+      
+      if (timeSinceLastUpdate > 5000) {
+        // La conexión parece perdida
+        if (connectionActive) {
+          connectionActive = false;
+          statusDot.classList.remove('active');
+          statusText.textContent = 'Desconectado';
+        }
+      } else {
+        // La conexión está activa
+        if (!connectionActive) {
+          connectionActive = true;
+          statusDot.classList.add('active');
+          statusText.textContent = 'Conectado';
+        }
+      }
+    }
+    
+    // Actualizar estadísticas
     async function actualizarDashboard() {
       try {
         const res = await fetch("/estadisticas");
+        lastUpdateTime = Date.now(); // Actualizar timestamp de última respuesta
         const data = await res.json();
+        
         document.getElementById("personas").textContent = data.personas;
         document.getElementById("emocion").textContent = data.emocion_predominante;
-        document.getElementById("conteo").textContent =
-          `😊 ${data.conteo_emociones.Feliz} | 😐 ${data.conteo_emociones.Neutra} | 😢 ${data.conteo_emociones.Triste}`;
+        
+        // Actualizar contadores individuales
+        document.getElementById("count-happy").textContent = data.conteo_emociones.Feliz;
+        document.getElementById("count-neutral").textContent = data.conteo_emociones.Neutra;
+        document.getElementById("count-sad").textContent = data.conteo_emociones.Triste;
+        document.getElementById("count-angry").textContent = data.conteo_emociones.Enojado;
+        document.getElementById("count-disgust").textContent = data.conteo_emociones.Disgusto;
+        document.getElementById("count-fear").textContent = data.conteo_emociones.Miedo;
+        document.getElementById("count-surprise").textContent = data.conteo_emociones.Sorpresa;
       } catch (error) {
         console.error("Error al cargar estadísticas:", error);
       }
     }
-
-    setInterval(actualizarDashboard, 2000); // cada 2 segundos
+    
+    // Eventos para detectar cuando la imagen se ha cargado
+    videoFeed.onload = function() {
+      lastUpdateTime = Date.now();
+    };
+    
+    // Monitoreo de la conexión y actualización de estadísticas periódicamente
+    setInterval(checkVideoConnection, 1000);
+    setInterval(actualizarDashboard, 1000);
+    
+    // Iniciar la primera actualización
+    actualizarDashboard();
   </script>
-
 </body>
 </html>
